@@ -4,8 +4,11 @@ library(XML)
 library(glue)
 
 if (F) {
+  # 路線情報を取得する
+  # 取得して絞り込んだ内容（＋移動時間の情報）をline_info.csvに保存しておいて、以降はそれを読み込む
   lines <- 
-    tibble(pref_cd = c(8,11,12,13,14)) %>%
+    # 県を指定して路線情報を取得
+    tibble(pref_cd = c(11,12,13,14)) %>%
     rowwise() %>%
     mutate(data = list(xmlParse(glue("http://www.ekidata.jp/api/p/{pref_cd}.xml")))) %>%
     mutate(data = list(getNodeSet(data, "//line"))) %>%
@@ -14,10 +17,12 @@ if (F) {
     unnest %>%
     select(-pref_cd) %>%
     distinct %>%
+    # JR限定、なぜか宇都宮線だけは路線名に「JR」がついていない
     filter(grepl("JR", line_name) | line_cd == '11319') %>%
     arrange(line_cd)
 }
 
+# 路線情報を読み取り
 lines <- read_csv("line_info.csv", 
                   col_types = cols(line_cd = col_character(), 
                                    line_name = col_character(), 
@@ -26,6 +31,7 @@ lines <- read_csv("line_info.csv",
 
 
 if (F) {
+  # 駅情報を取得
   stations <-
     lines %>%
     select(line_cd, line_name) %>%
@@ -34,39 +40,48 @@ if (F) {
     mutate(data = list(getNodeSet(data, "//station"))) %>%
     mutate(data = list(unlist(data))) %>%
     mutate(data = list(xmlToDataFrame(data, stringsAsFactors=F))) %>%
+    # 駅番号を追加
     mutate(data = list(bind_cols(data, station_no = 1:nrow(data)))) %>%
     unnest
 
+  # 取得した駅情報を保存しておいて、次回以降はそのファイルを読み込むようにする
   save(stations, file="stations.rdata")
 }
 
+# 駅情報の読み込み
 load("stations.rdata")
 
+# 路線に「裏山手線」を追加
 lines %<>%
   filter(line_cd == 11302) %>%
   mutate(line_cd = "113020", line_name='JR山手線２') %>%
   bind_rows(lines)
 
+# 裏山手線の駅情報、本来の山手線の駅番号を更新したもの（田端から駒込）
 yamanote2 <-
   stations %>%
   filter(line_cd == 11302) %>%
   mutate(line_cd = "113020", line_name='JR山手線２') %>%
   mutate(station_no = station_no + if_else(station_no > 15, -15, 15)) 
 
+# 駅情報に裏山手線を追加
 stations %<>%
   bind_rows(yamanote2)
 
+# 各の路線数、これが２以上なら乗換駅
 stations %<>%
   nest(-station_g_cd) %>%
   mutate(station_g_count = map_dbl(data, function(v) { nrow(v)})) %>%
   unnest
 
+# 駅情報のうちポケモン駅の情報
 pokemon_stations <- 
   read_csv("pokemon.csv") %>%
   inner_join(stations %>% select(station_g_cd, station_name) %>% distinct, by=c(station_name="station_name")) 
 
 
 
+# 駅間の移動情報をtibbleにする
 compose_route <- function(line_cd,line_name,S1_cd,S1_g_cd,S1_name,S2_name,S2_cd,S2_g_cd,time) {
   data_frame(line_cd=line_cd,
              line_name = line_name,
