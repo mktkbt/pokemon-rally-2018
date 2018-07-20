@@ -30,26 +30,27 @@ lines <- read_csv("line_info.csv",
                                    wait_time = col_double()))
 
 
-if (F) {
-  # 駅情報を取得
-  stations <-
-    lines %>%
-    select(line_cd, line_name) %>%
-    rowwise() %>%
-    mutate(data = list(xmlParse(glue("http://www.ekidata.jp/api/l/{line_cd}.xml")))) %>%
-    mutate(data = list(getNodeSet(data, "//station"))) %>%
-    mutate(data = list(unlist(data))) %>%
-    mutate(data = list(xmlToDataFrame(data, stringsAsFactors=F))) %>%
-    # 駅番号を追加
-    mutate(data = list(bind_cols(data, station_no = 1:nrow(data)))) %>%
-    unnest
+# 駅情報を取得
+stations <-
+  lines %>%
+  select(line_cd, line_name) %>%
+  rowwise() %>%
+  mutate(data = list(xmlParse(glue("http://www.ekidata.jp/api/l/{line_cd}.xml")))) %>%
+  mutate(data = list(getNodeSet(data, "//station"))) %>%
+  mutate(data = list(unlist(data))) %>%
+  mutate(data = list(xmlToDataFrame(data, stringsAsFactors=F))) %>%
+  # 駅番号を追加
+  mutate(data = list(bind_cols(data, station_no = 1:nrow(data)))) %>%
+  unnest
 
+if (F) {
   # 取得した駅情報を保存しておいて、次回以降はそのファイルを読み込むようにする
   save(stations, file="stations.rdata")
+
+  # 駅情報の読み込み
+  load("stations.rdata")
 }
 
-# 駅情報の読み込み
-load("stations.rdata")
 
 # 路線に「裏山手線」を追加
 lines %<>%
