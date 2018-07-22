@@ -69,7 +69,7 @@ Proc_lonlat <-
 # 進化の経緯の経路情報をhtmlに埋め込み
 html <- scan("map_template.html", what = character(), sep = "\n", blank.lines.skip = F)
 route.line <- '<textarea id="route"></textarea>'
-html[html == route.line] <- paste("<textarea id=\"route\">", paste(v, collapse="\n"), "\n</textarea>", sep="")
+html[html == route.line] <- paste("<textarea id=\"route\">", paste(Proc_lonlat, collapse="\n"), "\n</textarea>", sep="")
 out.file <- file("map.html")
 writeLines(html, out.file)
 close(out.file)
@@ -94,4 +94,4 @@ route_print <-
   unlist %>%
   paste(collapse = "\n")
 
-
+cat(route_print)
